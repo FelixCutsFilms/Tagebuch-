@@ -34,6 +34,8 @@
   main { flex:1; min-width:0; display:flex; flex-direction:column; }
   .bar { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid var(--line); }
   .bar .title { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:700; }
+  .nlabel { padding:6px 14px; border-top:1px solid var(--line); font-size:12px; color:var(--muted); }
+  #notes { flex:none; height:30%; border-top:1px solid var(--soft); }
   textarea { flex:1; width:100%; border:0; outline:0; resize:none; padding:18px 20px; background:var(--bg);
              color:var(--fg); font:inherit; }
   .foot { display:flex; align-items:center; gap:8px; padding:8px 14px; border-top:1px solid var(--line); }
@@ -51,6 +53,7 @@
     #status { display:none; }
     .foot button { flex:1; padding:10px 8px; }
     textarea { padding:14px; font-size:16px; line-height:1.7; }
+    #notes { height:34%; }
     aside { position:fixed; inset:0; width:100%; z-index:2; background:var(--bg); margin-left:0; border-right:0;
             padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); transition:transform .2s; }
     .app.closed aside { margin-left:0; transform:translateX(-100%); }
@@ -71,9 +74,10 @@
       <button id="today" title="Heute">Heute</button>
     </div>
     <textarea id="text" placeholder="Wie war dein Tag?" autofocus></textarea>
+    <div class="nlabel">Notizen &amp; Fragen</div>
+    <textarea id="notes" placeholder="- Notiz oder Frage …"></textarea>
     <div class="foot">
       <span id="status"></span>
-      <button id="share">Teilen</button>
       <button id="save">.md speichern</button>
     </div>
   </main>
@@ -86,10 +90,21 @@ const store = e => localStorage.setItem(KEY, JSON.stringify(e));
 const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const pretty = s => new Date(s + 'T12:00:00').toLocaleDateString('de-DE',
   { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-const toMd = (day, text) => `# ${pretty(day)}\n\n${text.trim()}\n`;
+const bullets = n => n.split('\n').map(l => l.trim()).filter(l => l && l !== '-')
+  .map(l => '- ' + l.replace(/^[-•*]\s*/, '')).join('\n');
+const toMd = (day, e) => {
+  let md = `# ${pretty(day)}\n\n${e.t.trim()}\n`;
+  const b = bullets(e.n);
+  if (b) md += `\n## Notizen & Fragen\n\n${b}\n`;
+  return md;
+};
+const isEmpty = e => !e.t.trim() && !bullets(e.n);
 const mobile = () => matchMedia('(max-width:700px)').matches;
 
 let entries = load();
+// Migration: früher String, jetzt { t: Text, n: Notizen }
+for (const d in entries) if (typeof entries[d] === 'string') entries[d] = { t: entries[d], n: '' };
+const get = d => entries[d] || { t:'', n:'' };
 let current = iso(new Date());
 
 const setOpen = open => $('app').classList.toggle('closed', !open);
@@ -98,7 +113,8 @@ const isOpen = () => !$('app').classList.contains('closed');
 function show(day) {
   current = day;
   $('date').textContent = pretty(day);
-  $('text').value = entries[day] || '';
+  $('text').value = get(day).t;
+  $('notes').value = get(day).n;
   $('status').textContent = '';
   renderList();
 }
@@ -112,18 +128,38 @@ function renderList() {
     if (day === current) li.className = 'active';
     li.innerHTML = '<b></b><small></small>';
     li.firstChild.textContent = pretty(day);
-    li.lastChild.textContent = (entries[day] || 'Noch leer').replace(/\s+/g, ' ');
+    li.lastChild.textContent = (get(day).t || get(day).n || 'Noch leer').replace(/\s+/g, ' ');
     li.onclick = () => { show(day); if (mobile()) setOpen(false); };
     ul.appendChild(li);
   });
 }
 
-$('text').addEventListener('input', () => {
-  const t = $('text').value;
-  if (t.trim()) entries[current] = t; else delete entries[current];
+function onInput() {
+  const e = { t: $('text').value, n: $('notes').value };
+  if (isEmpty(e)) delete entries[current]; else entries[current] = e;
   store(entries);
   $('status').textContent = 'Automatisch zwischengespeichert';
   renderList();
+}
+$('text').addEventListener('input', onInput);
+$('notes').addEventListener('input', onInput);
+
+// Notizen: jede Zeile bekommt automatisch einen Aufzählungspunkt
+const notes = $('notes');
+notes.addEventListener('focus', () => { if (!notes.value) { notes.value = '- '; } });
+notes.addEventListener('blur', () => { if (notes.value.trim() === '-') { notes.value = ''; onInput(); } });
+// beforeinput statt keydown: funktioniert auch mit Handy-Tastaturen
+notes.addEventListener('beforeinput', ev => {
+  if (ev.inputType !== 'insertLineBreak' && ev.inputType !== 'insertParagraph') return;
+  ev.preventDefault();
+  const v = notes.value, pos = notes.selectionStart;
+  const start = v.lastIndexOf('\n', pos - 1) + 1;
+  if (v.slice(start, pos).trim() === '-') {          // leere Zeile + Enter beendet die Liste
+    notes.setRangeText('', start, pos, 'end');
+  } else {
+    notes.setRangeText('\n- ', pos, notes.selectionEnd, 'end');
+  }
+  onInput();
 });
 
 function download(name, content) {
@@ -134,25 +170,15 @@ function download(name, content) {
 }
 
 $('save').onclick = () => {
-  const t = $('text').value;
-  if (!t.trim()) return $('status').textContent = 'Nichts zu speichern.';
-  download(`${current}.md`, toMd(current, t));
+  const e = get(current);
+  if (isEmpty(e)) return $('status').textContent = 'Nichts zu speichern.';
+  download(`${current}.md`, toMd(current, e));
   $('status').textContent = `${current}.md gespeichert (Ordner „Downloads“)`;
-};
-
-$('share').onclick = async () => {
-  const t = $('text').value;
-  if (!t.trim()) return $('status').textContent = 'Nichts zu teilen.';
-  const file = new File([toMd(current, t)], `${current}.md`, { type:'text/markdown' });
-  try {
-    if (navigator.canShare && navigator.canShare({ files:[file] })) await navigator.share({ files:[file] });
-    else download(file.name, toMd(current, t));
-  } catch (e) { /* abgebrochen */ }
 };
 
 $('all').onclick = () => {
   const days = Object.keys(entries).sort();
-  if (days.length) download('tagebuch.md', days.map(d => toMd(d, entries[d])).join('\n---\n\n'));
+  if (days.length) download('tagebuch.md', days.map(d => toMd(d, get(d))).join('\n---\n\n'));
 };
 
 $('today').onclick = () => show(iso(new Date()));
