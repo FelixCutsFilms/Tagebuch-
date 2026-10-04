@@ -3,51 +3,70 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1f2937">
+<meta name="theme-color" content="#ffffff">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>Tagebuch</title>
 <style>
-  :root { --bg:#fafaf7; --fg:#1f2937; --muted:#6b7280; --card:#fff; --accent:#2563eb; --line:#e5e7eb; }
+  :root { --bg:#fff; --fg:#000; --muted:#777; --line:#000; --soft:#eee; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#111827; --fg:#f3f4f6; --muted:#9ca3af; --card:#1f2937; --accent:#60a5fa; --line:#374151; }
+    :root { --bg:#000; --fg:#fff; --muted:#999; --line:#fff; --soft:#1a1a1a; }
   }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,sans-serif;
-         padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom); }
-  main { max-width:640px; margin:0 auto; padding:16px 0 48px; }
-  h1 { font-size:1.3rem; margin:0 0 4px; }
-  #date { color:var(--muted); margin-bottom:12px; }
-  textarea { width:100%; min-height:45vh; padding:14px; font:inherit; color:inherit; background:var(--card);
-             border:1px solid var(--line); border-radius:12px; resize:vertical; }
-  .row { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
-  button { font:inherit; padding:10px 16px; border-radius:10px; border:1px solid var(--line);
-           background:var(--card); color:var(--fg); cursor:pointer; }
-  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
-  #status { color:var(--muted); font-size:.85rem; margin-top:8px; min-height:1.2em; }
-  h2 { font-size:1.05rem; margin:32px 0 8px; }
-  ul { list-style:none; padding:0; margin:0; }
-  li { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 14px;
-       margin-bottom:8px; cursor:pointer; }
-  li small { display:block; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  * { box-sizing:border-box; border-radius:0; }
+  html, body { height:100%; margin:0; }
+  body { background:var(--bg); color:var(--fg); font:15px/1.6 ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace; }
+  .app { display:flex; height:100%; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+
+  aside { width:280px; flex:none; border-right:1px solid var(--line); display:flex; flex-direction:column;
+          overflow:hidden; transition:margin-left .2s; }
+  .app.closed aside { margin-left:-281px; }
+  aside header { padding:12px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+  #list { flex:1; overflow-y:auto; list-style:none; margin:0; padding:0; }
+  #list li { padding:10px 14px; border-bottom:1px solid var(--soft); cursor:pointer; }
+  #list li.active { background:var(--fg); color:var(--bg); }
+  #list li b { display:block; font-weight:700; }
+  #list li small { display:block; opacity:.6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #list li.empty { cursor:default; opacity:.6; }
+  aside footer { padding:10px 14px; border-top:1px solid var(--line); }
+
+  main { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .bar { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid var(--line); }
+  .bar .title { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:700; }
+  textarea { flex:1; width:100%; border:0; outline:0; resize:none; padding:18px 20px; background:var(--bg);
+             color:var(--fg); font:inherit; }
+  #status { padding:6px 14px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; min-height:30px; }
+
+  button { font:inherit; background:var(--bg); color:var(--fg); border:1px solid var(--line); padding:6px 12px; cursor:pointer; }
+  button:hover, button:active { background:var(--fg); color:var(--bg); }
+  .full { width:100%; }
+
+  @media (max-width:700px) {
+    aside { position:fixed; inset:0; width:100%; z-index:2; background:var(--bg); margin-left:0; border-right:0;
+            padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); transition:transform .2s; }
+    .app.closed aside { margin-left:0; transform:translateX(-100%); }
+  }
 </style>
 </head>
 <body>
-<main>
-  <h1>📔 Tagebuch</h1>
-  <div id="date"></div>
-  <textarea id="text" placeholder="Wie war dein Tag?" autofocus></textarea>
-  <div class="row">
-    <button class="primary" id="save">Als .md speichern</button>
-    <button id="share">Teilen</button>
-    <button id="today">Heute</button>
-  </div>
-  <div id="status"></div>
-  <h2>Frühere Einträge</h2>
-  <ul id="list"></ul>
-  <div class="row"><button id="all">Alle als .md exportieren</button></div>
-</main>
+<div class="app" id="app">
+  <aside>
+    <header><b>Tagebuch</b><button id="close" title="Liste ausblenden">⟨</button></header>
+    <ul id="list"></ul>
+    <footer><button class="full" id="all">Alle als .md exportieren</button></footer>
+  </aside>
+  <main>
+    <div class="bar">
+      <button id="toggle" title="Liste ein-/ausblenden">☰</button>
+      <span class="title" id="date"></span>
+      <button id="today" title="Heute">Heute</button>
+      <button id="share">Teilen</button>
+      <button id="save">.md speichern</button>
+    </div>
+    <textarea id="text" placeholder="Wie war dein Tag?" autofocus></textarea>
+    <div id="status"></div>
+  </main>
+</div>
 <script>
 const KEY = 'tagebuch-entries';
 const $ = id => document.getElementById(id);
@@ -57,9 +76,13 @@ const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
 const pretty = s => new Date(s + 'T12:00:00').toLocaleDateString('de-DE',
   { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 const toMd = (day, text) => `# ${pretty(day)}\n\n${text.trim()}\n`;
+const mobile = () => matchMedia('(max-width:700px)').matches;
 
 let entries = load();
 let current = iso(new Date());
+
+const setOpen = open => $('app').classList.toggle('closed', !open);
+const isOpen = () => !$('app').classList.contains('closed');
 
 function show(day) {
   current = day;
@@ -71,18 +94,19 @@ function show(day) {
 
 function renderList() {
   const ul = $('list'); ul.innerHTML = '';
-  Object.keys(entries).sort().reverse().forEach(day => {
+  const days = new Set(Object.keys(entries));
+  days.add(iso(new Date()));               // heutiger Tag ist immer in der Liste
+  [...days].sort().reverse().forEach(day => {
     const li = document.createElement('li');
+    if (day === current) li.className = 'active';
     li.innerHTML = '<b></b><small></small>';
     li.firstChild.textContent = pretty(day);
-    li.lastChild.textContent = entries[day].replace(/\s+/g, ' ');
-    li.onclick = () => { show(day); scrollTo({ top: 0, behavior: 'smooth' }); };
+    li.lastChild.textContent = (entries[day] || 'Noch leer').replace(/\s+/g, ' ');
+    li.onclick = () => { show(day); if (mobile()) setOpen(false); };
     ul.appendChild(li);
   });
-  if (!ul.children.length) ul.innerHTML = '<li style="cursor:default">Noch keine Einträge.</li>';
 }
 
-// Autosave in the browser while typing
 $('text').addEventListener('input', () => {
   const t = $('text').value;
   if (t.trim()) entries[current] = t; else delete entries[current];
@@ -92,8 +116,8 @@ $('text').addEventListener('input', () => {
 });
 
 function download(name, content) {
-  const url = URL.createObjectURL(new Blob([content], { type: 'text/markdown;charset=utf-8' }));
-  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  const url = URL.createObjectURL(new Blob([content], { type:'text/markdown;charset=utf-8' }));
+  const a = Object.assign(document.createElement('a'), { href:url, download:name });
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -108,21 +132,23 @@ $('save').onclick = () => {
 $('share').onclick = async () => {
   const t = $('text').value;
   if (!t.trim()) return $('status').textContent = 'Nichts zu teilen.';
-  const file = new File([toMd(current, t)], `${current}.md`, { type: 'text/markdown' });
+  const file = new File([toMd(current, t)], `${current}.md`, { type:'text/markdown' });
   try {
-    if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file] });
-    else { download(file.name, toMd(current, t)); }
+    if (navigator.canShare && navigator.canShare({ files:[file] })) await navigator.share({ files:[file] });
+    else download(file.name, toMd(current, t));
   } catch (e) { /* abgebrochen */ }
 };
 
 $('all').onclick = () => {
   const days = Object.keys(entries).sort();
-  if (!days.length) return;
-  download('tagebuch.md', days.map(d => toMd(d, entries[d])).join('\n---\n\n'));
+  if (days.length) download('tagebuch.md', days.map(d => toMd(d, entries[d])).join('\n---\n\n'));
 };
 
 $('today').onclick = () => show(iso(new Date()));
+$('toggle').onclick = () => setOpen(!isOpen());
+$('close').onclick = () => setOpen(false);
 
+setOpen(!mobile());
 show(current);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 </script>
