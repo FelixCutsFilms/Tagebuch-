@@ -1,4 +1,4 @@
-const CACHE = 'tagebuch-v2';
+const CACHE = 'tagebuch-v3';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))));
 self.addEventListener('activate', e => e.waitUntil(
