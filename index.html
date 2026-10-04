@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f2937">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Tagebuch</title>
+<style>
+  :root { --bg:#fafaf7; --fg:#1f2937; --muted:#6b7280; --card:#fff; --accent:#2563eb; --line:#e5e7eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111827; --fg:#f3f4f6; --muted:#9ca3af; --card:#1f2937; --accent:#60a5fa; --line:#374151; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,sans-serif;
+         padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom); }
+  main { max-width:640px; margin:0 auto; padding:16px 0 48px; }
+  h1 { font-size:1.3rem; margin:0 0 4px; }
+  #date { color:var(--muted); margin-bottom:12px; }
+  textarea { width:100%; min-height:45vh; padding:14px; font:inherit; color:inherit; background:var(--card);
+             border:1px solid var(--line); border-radius:12px; resize:vertical; }
+  .row { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  button { font:inherit; padding:10px 16px; border-radius:10px; border:1px solid var(--line);
+           background:var(--card); color:var(--fg); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  #status { color:var(--muted); font-size:.85rem; margin-top:8px; min-height:1.2em; }
+  h2 { font-size:1.05rem; margin:32px 0 8px; }
+  ul { list-style:none; padding:0; margin:0; }
+  li { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 14px;
+       margin-bottom:8px; cursor:pointer; }
+  li small { display:block; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+</style>
+</head>
+<body>
+<main>
+  <h1>📔 Tagebuch</h1>
+  <div id="date"></div>
+  <textarea id="text" placeholder="Wie war dein Tag?" autofocus></textarea>
+  <div class="row">
+    <button class="primary" id="save">Als .md speichern</button>
+    <button id="share">Teilen</button>
+    <button id="today">Heute</button>
+  </div>
+  <div id="status"></div>
+  <h2>Frühere Einträge</h2>
+  <ul id="list"></ul>
+  <div class="row"><button id="all">Alle als .md exportieren</button></div>
+</main>
+<script>
+const KEY = 'tagebuch-entries';
+const $ = id => document.getElementById(id);
+const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
+const store = e => localStorage.setItem(KEY, JSON.stringify(e));
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const pretty = s => new Date(s + 'T12:00:00').toLocaleDateString('de-DE',
+  { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+const toMd = (day, text) => `# ${pretty(day)}\n\n${text.trim()}\n`;
+
+let entries = load();
+let current = iso(new Date());
+
+function show(day) {
+  current = day;
+  $('date').textContent = pretty(day);
+  $('text').value = entries[day] || '';
+  $('status').textContent = '';
+  renderList();
+}
+
+function renderList() {
+  const ul = $('list'); ul.innerHTML = '';
+  Object.keys(entries).sort().reverse().forEach(day => {
+    const li = document.createElement('li');
+    li.innerHTML = '<b></b><small></small>';
+    li.firstChild.textContent = pretty(day);
+    li.lastChild.textContent = entries[day].replace(/\s+/g, ' ');
+    li.onclick = () => { show(day); scrollTo({ top: 0, behavior: 'smooth' }); };
+    ul.appendChild(li);
+  });
+  if (!ul.children.length) ul.innerHTML = '<li style="cursor:default">Noch keine Einträge.</li>';
+}
+
+// Autosave in the browser while typing
+$('text').addEventListener('input', () => {
+  const t = $('text').value;
+  if (t.trim()) entries[current] = t; else delete entries[current];
+  store(entries);
+  $('status').textContent = 'Automatisch zwischengespeichert';
+  renderList();
+});
+
+function download(name, content) {
+  const url = URL.createObjectURL(new Blob([content], { type: 'text/markdown;charset=utf-8' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+$('save').onclick = () => {
+  const t = $('text').value;
+  if (!t.trim()) return $('status').textContent = 'Nichts zu speichern.';
+  download(`${current}.md`, toMd(current, t));
+  $('status').textContent = `${current}.md gespeichert (Ordner „Downloads“)`;
+};
+
+$('share').onclick = async () => {
+  const t = $('text').value;
+  if (!t.trim()) return $('status').textContent = 'Nichts zu teilen.';
+  const file = new File([toMd(current, t)], `${current}.md`, { type: 'text/markdown' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file] });
+    else { download(file.name, toMd(current, t)); }
+  } catch (e) { /* abgebrochen */ }
+};
+
+$('all').onclick = () => {
+  const days = Object.keys(entries).sort();
+  if (!days.length) return;
+  download('tagebuch.md', days.map(d => toMd(d, entries[d])).join('\n---\n\n'));
+};
+
+$('today').onclick = () => show(iso(new Date()));
+
+show(current);
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
