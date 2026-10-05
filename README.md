@@ -15,7 +15,7 @@ Im Ordner `android-app/` liegt eine Capacitor-App, die dieselbe Oberfläche nutz
 Plugin: `FolderStoragePlugin.java`).
 
 1. GitHub → Tab **Actions** → „Android APK“ → **Run workflow** (läuft auch automatisch bei Änderungen auf `main`).
-2. Nach dem Lauf unten bei **Artifacts** `tagebuch-apk` herunterladen, entpacken, `app-debug.apk` aufs Handy kopieren und installieren
+2. Danach unter **Releases** (rechte Seitenleiste, Eintrag „Tagebuch APK“) die Datei `Tagebuch.apk` direkt aufs Handy laden und installieren
    (Android fragt einmal nach „Installation aus unbekannten Quellen“).
 3. App öffnen → **📁 Ordner wählen** → Ordner auswählen. Ab dann wird jeder Eintrag automatisch als `JJJJ-MM-TT.md` dort gespeichert.
 
