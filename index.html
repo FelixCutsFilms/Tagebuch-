@@ -45,6 +45,7 @@
   button { font:inherit; background:var(--bg); color:var(--fg); border:1px solid var(--line); padding:6px 12px; cursor:pointer; }
   button:hover, button:active { background:var(--fg); color:var(--bg); }
   .full { width:100%; }
+  #err { position:fixed; left:0; right:0; top:0; z-index:9; background:#fff; color:#000; border-bottom:2px solid #000; padding:8px 12px; font-size:12px; white-space:pre-wrap; }
 
   @media (max-width:700px) {
     body { font-size:14px; }
@@ -61,6 +62,7 @@
 </style>
 </head>
 <body>
+<div id="err" hidden></div>
 <div class="app" id="app">
   <aside>
     <header><b>Tagebuch</b><button id="close" title="Liste ausblenden">⟨</button></header>
@@ -84,6 +86,9 @@
   </main>
 </div>
 <script>
+function showError(m) { const e = document.getElementById('err'); e.hidden = false; e.textContent += m + '\n'; }
+addEventListener('error', ev => showError((ev.message || 'Fehler') + ' (Zeile ' + ev.lineno + ')'));
+addEventListener('unhandledrejection', ev => showError('Promise: ' + (ev.reason && ev.reason.message || ev.reason)));
 const KEY = 'tagebuch-entries';
 const $ = id => document.getElementById(id);
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
@@ -171,9 +176,18 @@ function download(name, content) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+setOpen(!mobile());
+show(current);
+
 // --- Android-App: Ordner wählen und .md-Dateien direkt dort ablegen ---
-const FS = (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform())
-  ? Capacitor.registerPlugin('FolderStorage') : null;
+const FS = (() => {
+  try {
+    const C = window.Capacitor;
+    if (C && C.isNativePlatform && C.isNativePlatform())
+      return C.registerPlugin ? C.registerPlugin('FolderStorage') : C.Plugins.FolderStorage;
+  } catch (e) { showError('Plugin: ' + e); }
+  return null;
+})();
 let folderName = null, writeTimer = null;
 
 function flash(btn, text) {
@@ -214,7 +228,7 @@ async function writeAll() {
 if (FS) {
   $('folder').hidden = false;
   $('all').textContent = 'Alle Einträge in Ordner schreiben';
-  FS.getFolder().then(r => { folderName = r.selected ? r.name : null; folderLabel(); });
+  FS.getFolder().then(r => { folderName = r.selected ? r.name : null; folderLabel(); }).catch(e => showError('getFolder: ' + (e.message || e)));
   $('folder').onclick = async () => {
     if (await pickFolder()) { await writeAll(); flash($('folder'), 'Gespeichert ✓'); }
   };
@@ -251,8 +265,6 @@ $('today').onclick = () => show(iso(new Date()));
 $('toggle').onclick = () => setOpen(!isOpen());
 $('close').onclick = () => setOpen(false);
 
-setOpen(!mobile());
-show(current);
 if ('serviceWorker' in navigator && !FS) navigator.serviceWorker.register('sw.js');
 </script>
 </body>
