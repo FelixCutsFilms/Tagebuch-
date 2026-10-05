@@ -45,7 +45,8 @@
   button { font:inherit; background:var(--bg); color:var(--fg); border:1px solid var(--line); padding:6px 12px; cursor:pointer; }
   button:hover, button:active { background:var(--fg); color:var(--bg); }
   .full { width:100%; }
-  #toggle { padding:1px 7px; font-size:15px; line-height:1.3; }
+  button.icon { display:inline-flex; align-items:center; justify-content:center; width:34px; height:30px; padding:0; }
+  aside footer .full + .full { margin-top:8px; }
   #err { position:fixed; left:0; right:0; top:0; z-index:9; background:#fff; color:#000; border-bottom:2px solid #000; padding:8px 12px; font-size:12px; white-space:pre-wrap; }
 
   @media (max-width:700px) {
@@ -66,13 +67,13 @@
 <div id="err" hidden></div>
 <div class="app" id="app">
   <aside>
-    <header><b>Tagebuch</b><button id="close" title="Liste ausblenden">⟨</button></header>
+    <header><b>Tagebuch</b><button id="close" class="icon" title="Liste ausblenden"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" fill="none"/></svg></button></header>
     <ul id="list"></ul>
-    <footer><button class="full" id="all">Alle als .md exportieren</button></footer>
+    <footer><button class="full" id="folder" hidden>📁 Speicherordner wählen</button><button class="full" id="all">Alle als .md exportieren</button></footer>
   </aside>
   <main>
     <div class="bar">
-      <button id="toggle" title="Liste ein-/ausblenden">☰</button>
+      <button id="toggle" class="icon" title="Liste ein-/ausblenden"><svg width="16" height="12" viewBox="0 0 16 12"><path d="M0 1h16M0 6h16M0 11h16" stroke="currentColor" stroke-width="2" fill="none"/></svg></button>
       <span class="title" id="date"></span>
     </div>
     <textarea id="text" placeholder="Wie war dein Tag?" autofocus></textarea>
@@ -80,7 +81,6 @@
     <textarea id="notes" placeholder="- Notiz oder Frage …"></textarea>
     <div class="foot">
       <span id="status"></span>
-      <button id="folder" hidden>📁 Ordner wählen</button>
       <button id="save">.md speichern</button>
     </div>
   </main>
@@ -197,7 +197,7 @@ function flash(btn, text) {
   btn._t = setTimeout(() => { btn.textContent = btn.dataset.label; }, 1800);
 }
 function folderLabel() {
-  $('folder').textContent = $('folder').dataset.label = folderName ? `📁 ${folderName}` : '📁 Ordner wählen';
+  $('folder').textContent = folderName ? `📁 Ordner: ${folderName}` : '📁 Speicherordner wählen';
 }
 async function writeDay(day) {
   const e = get(day);
@@ -209,7 +209,7 @@ function queueWrite() {
   clearTimeout(writeTimer);
   const day = current;
   writeTimer = setTimeout(() => writeDay(day).catch(err => {
-    $('status').textContent = 'Fehler beim Speichern: ' + (err.message || err);
+    showError('Speichern fehlgeschlagen: ' + (err.message || err));
   }), 700);
 }
 async function pickFolder() {
@@ -226,15 +226,20 @@ async function writeAll() {
 }
 
 if (FS) {
+  // Android-App: alles automatisch – Speichern-Leiste und Export-Knopf werden nicht gebraucht
   $('folder').hidden = false;
-  $('all').textContent = 'Alle Einträge in Ordner schreiben';
-  FS.getFolder().then(r => { folderName = r.selected ? r.name : null; folderLabel(); }).catch(e => showError('getFolder: ' + (e.message || e)));
+  $('all').hidden = true;
+  document.querySelector('.foot').style.display = 'none';
+  FS.getFolder().then(r => {
+    folderName = r.selected ? r.name : null; folderLabel();
+    if (!folderName) setOpen(true);          // erster Start: Menü mit Ordner-Auswahl zeigen
+  }).catch(e => showError('getFolder: ' + (e.message || e)));
   $('folder').onclick = async () => {
-    if (await pickFolder()) { await writeAll(); flash($('folder'), 'Gespeichert ✓'); }
+    if (await pickFolder()) { await writeAll(); setOpen(false); }
   };
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden && writeTimer) { clearTimeout(writeTimer); writeDay(current).catch(() => {}); }
-  });
+  const flush = () => { if (writeTimer) { clearTimeout(writeTimer); writeTimer = null; writeDay(current).catch(() => {}); } };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
+  addEventListener('pagehide', flush);
 }
 
 $('save').onclick = async () => {
