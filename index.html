@@ -78,6 +78,7 @@
     <textarea id="notes" placeholder="- Notiz oder Frage …"></textarea>
     <div class="foot">
       <span id="status"></span>
+      <button id="folder" hidden>📁 Ordner wählen</button>
       <button id="save">.md speichern</button>
     </div>
   </main>
@@ -140,6 +141,7 @@ function onInput() {
   store(entries);
   $('status').textContent = 'Automatisch zwischengespeichert';
   renderList();
+  queueWrite();
 }
 $('text').addEventListener('input', onInput);
 $('notes').addEventListener('input', onInput);
@@ -169,14 +171,78 @@ function download(name, content) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-$('save').onclick = () => {
+// --- Android-App: Ordner wählen und .md-Dateien direkt dort ablegen ---
+const FS = (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform())
+  ? Capacitor.registerPlugin('FolderStorage') : null;
+let folderName = null, writeTimer = null;
+
+function flash(btn, text) {
+  const old = btn.dataset.label || (btn.dataset.label = btn.textContent);
+  btn.textContent = text;
+  clearTimeout(btn._t);
+  btn._t = setTimeout(() => { btn.textContent = btn.dataset.label; }, 1800);
+}
+function folderLabel() {
+  $('folder').textContent = $('folder').dataset.label = folderName ? `📁 ${folderName}` : '📁 Ordner wählen';
+}
+async function writeDay(day) {
+  const e = get(day);
+  if (!folderName || isEmpty(e)) return;
+  await FS.writeFile({ name: `${day}.md`, content: toMd(day, e) });
+}
+function queueWrite() {
+  if (!FS || !folderName) return;
+  clearTimeout(writeTimer);
+  const day = current;
+  writeTimer = setTimeout(() => writeDay(day).catch(err => {
+    $('status').textContent = 'Fehler beim Speichern: ' + (err.message || err);
+  }), 700);
+}
+async function pickFolder() {
+  try {
+    const r = await FS.pickFolder();
+    folderName = r.name; folderLabel();
+    return true;
+  } catch (e) { return false; }   // abgebrochen
+}
+async function writeAll() {
+  const days = Object.keys(entries);
+  for (const d of days) await writeDay(d);
+  return days.length;
+}
+
+if (FS) {
+  $('folder').hidden = false;
+  $('all').textContent = 'Alle Einträge in Ordner schreiben';
+  FS.getFolder().then(r => { folderName = r.selected ? r.name : null; folderLabel(); });
+  $('folder').onclick = async () => {
+    if (await pickFolder()) { await writeAll(); flash($('folder'), 'Gespeichert ✓'); }
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && writeTimer) { clearTimeout(writeTimer); writeDay(current).catch(() => {}); }
+  });
+}
+
+$('save').onclick = async () => {
   const e = get(current);
   if (isEmpty(e)) return $('status').textContent = 'Nichts zu speichern.';
+  if (FS) {
+    if (!folderName && !(await pickFolder())) return;
+    try { await writeDay(current); flash($('save'), 'Gespeichert ✓'); }
+    catch (err) { $('status').textContent = 'Fehler: ' + (err.message || err); flash($('save'), 'Fehler'); }
+    return;
+  }
   download(`${current}.md`, toMd(current, e));
   $('status').textContent = `${current}.md gespeichert (Ordner „Downloads“)`;
 };
 
-$('all').onclick = () => {
+$('all').onclick = async () => {
+  if (FS) {
+    if (!folderName && !(await pickFolder())) return;
+    const n = await writeAll();
+    $('status').textContent = `${n} Dateien in „${folderName}“ geschrieben`;
+    return;
+  }
   const days = Object.keys(entries).sort();
   if (days.length) download('tagebuch.md', days.map(d => toMd(d, get(d))).join('\n---\n\n'));
 };
@@ -187,7 +253,7 @@ $('close').onclick = () => setOpen(false);
 
 setOpen(!mobile());
 show(current);
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+if ('serviceWorker' in navigator && !FS) navigator.serviceWorker.register('sw.js');
 </script>
 </body>
 </html>
