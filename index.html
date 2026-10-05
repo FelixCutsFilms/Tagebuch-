@@ -73,7 +73,6 @@
     <div class="bar">
       <button id="toggle" title="Liste ein-/ausblenden">☰</button>
       <span class="title" id="date"></span>
-      <button id="today" title="Heute">Heute</button>
     </div>
     <textarea id="text" placeholder="Wie war dein Tag?" autofocus></textarea>
     <div class="nlabel">Notizen &amp; Fragen</div>
@@ -261,7 +260,15 @@ $('all').onclick = async () => {
   if (days.length) download('tagebuch.md', days.map(d => toMd(d, get(d))).join('\n---\n\n'));
 };
 
-$('today').onclick = () => show(iso(new Date()));
+// Über Mitternacht offen gelassen: beim Zurückkehren automatisch zum neuen Tag wechseln
+let lastToday = iso(new Date());
+document.addEventListener('visibilitychange', () => {
+  const now = iso(new Date());
+  if (!document.hidden && now !== lastToday) {
+    if (current === lastToday) show(now); else renderList();
+    lastToday = now;
+  }
+});
 $('toggle').onclick = () => setOpen(!isOpen());
 $('close').onclick = () => setOpen(false);
 
