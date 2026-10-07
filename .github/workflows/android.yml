@@ -41,5 +41,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp android-app/android/app/build/outputs/apk/debug/app-debug.apk Tagebuch.apk
-          gh release delete apk-latest --yes --cleanup-tag || true
-          gh release create apk-latest Tagebuch.apk --title "Tagebuch APK" --notes "Neueste Android-App. Datei Tagebuch.apk herunterladen und installieren."
+          # Release bleibt bestehen, nur die Datei wird ersetzt (kein Zeitfenster ohne Download)
+          gh release view apk-latest >/dev/null 2>&1 || gh release create apk-latest --title "Tagebuch APK" --notes "Neueste Android-App. Datei Tagebuch.apk herunterladen und installieren."
+          gh release upload apk-latest Tagebuch.apk --clobber
