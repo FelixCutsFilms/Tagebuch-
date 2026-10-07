@@ -36,8 +36,8 @@
   .bar .title { flex:1; min-width:0; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:700; }
   .nlabel { padding:6px 14px; border-top:1px solid var(--line); font-size:12px; color:var(--muted); }
   #scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
-  #text { min-height:calc(var(--ch, 400px) * .64); }
-  #notes { min-height:calc(var(--ch, 400px) * .36 - 32px); }
+  #text { min-height:calc(var(--ch, 400px) * .76); }
+  #notes { min-height:calc(var(--ch, 400px) * .24 - 32px); }
   textarea { display:block; width:100%; border:0; overflow:hidden; outline:0; resize:none; padding:18px 20px; background:var(--bg);
              color:var(--fg); font:inherit; }
   .foot { display:flex; align-items:center; gap:8px; padding:8px 14px; border-top:1px solid var(--line); }
@@ -181,7 +181,7 @@ function download(name, content) {
 }
 
 // Beide Felder wachsen mit dem Text; gescrollt wird der gesamte Bereich unter der oberen Leiste.
-// Trennlinie liegt im unteren Drittel (Text ≈ 64 %, Notizen ≈ 36 % der sichtbaren Höhe).
+// Trennlinie liegt im unteren Drittel (Text ≈ 76 %, Notizen ≈ 24 % der sichtbaren Höhe).
 function autosize() {
   $('scroll').style.setProperty('--ch', $('scroll').clientHeight + 'px');
   for (const ta of [$('text'), $('notes')]) {
