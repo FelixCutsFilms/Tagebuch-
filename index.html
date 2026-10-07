@@ -35,8 +35,10 @@
   .bar { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid var(--line); }
   .bar .title { flex:1; min-width:0; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:700; }
   .nlabel { padding:6px 14px; border-top:1px solid var(--line); font-size:12px; color:var(--muted); }
-  #notes { flex:none; height:30%; border-top:1px solid var(--soft); }
-  textarea { flex:1; min-height:0; width:100%; border:0; outline:0; resize:none; padding:18px 20px; background:var(--bg);
+  #scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
+  #text { min-height:calc(var(--ch, 400px) * .64); }
+  #notes { min-height:calc(var(--ch, 400px) * .36 - 32px); }
+  textarea { display:block; width:100%; border:0; overflow:hidden; outline:0; resize:none; padding:18px 20px; background:var(--bg);
              color:var(--fg); font:inherit; }
   .foot { display:flex; align-items:center; gap:8px; padding:8px 14px; border-top:1px solid var(--line); }
   #status { flex:1; min-width:0; color:var(--muted); font-size:12px; line-height:1.3; }
@@ -56,7 +58,6 @@
     #status { display:none; }
     .foot button { flex:1; padding:10px 8px; }
     textarea { padding:14px; font-size:16px; line-height:1.7; }
-    #notes { height:34%; }
     aside { position:fixed; inset:0; width:100%; z-index:2; background:var(--bg); margin-left:0; border-right:0;
             padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); transition:transform .2s; }
     .app.closed aside { margin-left:0; transform:translateX(-100%); }
@@ -76,9 +77,11 @@
       <button id="toggle" class="icon" title="Liste ein-/ausblenden"><svg width="16" height="12" viewBox="0 0 16 12"><path d="M0 1h16M0 6h16M0 11h16" stroke="currentColor" stroke-width="2" fill="none"/></svg></button>
       <span class="title" id="date"></span>
     </div>
-    <textarea id="text" placeholder="Wie war dein Tag?" autofocus></textarea>
-    <div class="nlabel">Notizen &amp; Fragen</div>
-    <textarea id="notes" placeholder="- Notiz oder Frage …"></textarea>
+    <div id="scroll">
+      <textarea id="text" placeholder="Wie war dein Tag?" autofocus></textarea>
+      <div class="nlabel">Notizen &amp; Fragen</div>
+      <textarea id="notes" placeholder="- Notiz oder Frage …"></textarea>
+    </div>
     <div class="foot">
       <span id="status"></span>
       <button id="save">.md speichern</button>
@@ -121,6 +124,7 @@ function show(day) {
   $('date').textContent = pretty(day);
   $('text').value = get(day).t;
   $('notes').value = get(day).n;
+  if (typeof autosize === 'function') { autosize(); $('scroll').scrollTop = 0; }
   $('status').textContent = '';
   renderList();
 }
@@ -176,8 +180,22 @@ function download(name, content) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// Beide Felder wachsen mit dem Text; gescrollt wird der gesamte Bereich unter der oberen Leiste.
+// Trennlinie liegt im unteren Drittel (Text ≈ 64 %, Notizen ≈ 36 % der sichtbaren Höhe).
+function autosize() {
+  $('scroll').style.setProperty('--ch', $('scroll').clientHeight + 'px');
+  for (const ta of [$('text'), $('notes')]) {
+    ta.style.height = 'auto';
+    ta.style.height = ta.scrollHeight + 'px';
+  }
+}
+$('text').addEventListener('input', autosize);
+$('notes').addEventListener('input', autosize);
+addEventListener('resize', autosize);
+
 setOpen(!mobile());
 show(current);
+autosize();
 
 // --- Android-App: Ordner wählen und .md-Dateien direkt dort ablegen ---
 const FS = (() => {
@@ -278,7 +296,7 @@ document.addEventListener('visibilitychange', () => {
 $('toggle').onclick = () => setOpen(!isOpen());
 $('close').onclick = () => setOpen(false);
 
-if ('serviceWorker' in navigator && !FS) navigator.serviceWorker.register('sw.js');
+if ('serviceWorker' in navigator && !FS) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
 </html>
