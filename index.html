@@ -15,8 +15,8 @@
     :root { --bg:#000; --fg:#fff; --muted:#999; --line:#fff; --soft:#1a1a1a; }
   }
   * { box-sizing:border-box; border-radius:0; }
-  html, body { height:100%; margin:0; }
-  body { background:var(--bg); color:var(--fg); font:15px/1.6 ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace; }
+  html, body { height:100%; margin:0; overflow:hidden; overscroll-behavior:none; }
+  body { position:fixed; inset:0; background:var(--bg); color:var(--fg); font:15px/1.6 ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace; }
   .app { display:flex; height:100%; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
 
   aside { width:280px; flex:none; border-right:1px solid var(--line); display:flex; flex-direction:column;
@@ -31,12 +31,12 @@
   #list li.empty { cursor:default; opacity:.6; }
   aside footer { padding:10px 14px; border-top:1px solid var(--line); }
 
-  main { flex:1; min-width:0; display:flex; flex-direction:column; }
+  main { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; }
   .bar { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid var(--line); }
   .bar .title { flex:1; min-width:0; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:700; }
   .nlabel { padding:6px 14px; border-top:1px solid var(--line); font-size:12px; color:var(--muted); }
   #notes { flex:none; height:30%; border-top:1px solid var(--soft); }
-  textarea { flex:1; width:100%; border:0; outline:0; resize:none; padding:18px 20px; background:var(--bg);
+  textarea { flex:1; min-height:0; width:100%; border:0; outline:0; resize:none; padding:18px 20px; background:var(--bg);
              color:var(--fg); font:inherit; }
   .foot { display:flex; align-items:center; gap:8px; padding:8px 14px; border-top:1px solid var(--line); }
   #status { flex:1; min-width:0; color:var(--muted); font-size:12px; line-height:1.3; }
