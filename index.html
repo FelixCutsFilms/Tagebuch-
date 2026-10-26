@@ -193,6 +193,31 @@ $('text').addEventListener('input', autosize);
 $('notes').addEventListener('input', autosize);
 addEventListener('resize', autosize);
 
+// Schreibmarke im sichtbaren Bereich halten (z. B. Notizen unten bei langem Text und offener Tastatur)
+const mirror = document.createElement('div');
+mirror.style.cssText = 'position:absolute;visibility:hidden;top:0;left:-9999px;white-space:pre-wrap;overflow-wrap:break-word;';
+document.body.appendChild(mirror);
+function caretVisible(ta) {
+  if (!ta || document.activeElement !== ta) return;
+  const sc = $('scroll'), cs = getComputedStyle(ta);
+  for (const k of ['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','paddingTop','paddingRight','paddingBottom','paddingLeft','boxSizing','width'])
+    mirror.style[k] = cs[k];
+  mirror.textContent = ta.value.slice(0, ta.selectionStart);
+  const mark = document.createElement('span'); mark.textContent = '\u200b'; mirror.appendChild(mark);
+  const lineH = parseFloat(cs.lineHeight) || 24;
+  const y = ta.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop + mark.offsetTop;
+  const margin = lineH * 1.5;
+  if (y - margin < sc.scrollTop) sc.scrollTop = Math.max(0, y - margin);
+  else if (y + lineH + margin > sc.scrollTop + sc.clientHeight) sc.scrollTop = y + lineH + margin - sc.clientHeight;
+}
+for (const ta of [$('text'), $('notes')]) {
+  ta.addEventListener('input', () => caretVisible(ta));
+  ta.addEventListener('keyup', () => caretVisible(ta));
+  ta.addEventListener('click', () => caretVisible(ta));
+  ta.addEventListener('focus', () => { setTimeout(() => caretVisible(ta), 100); setTimeout(() => caretVisible(ta), 400); });
+}
+addEventListener('resize', () => { autosize(); caretVisible(document.activeElement); });
+
 setOpen(!mobile());
 show(current);
 autosize();
